@@ -188,10 +188,12 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      //panic("uvmunmap: walk");
+	goto end;
     if((*pte & PTE_V) == 0){
-      printf("va=%p pte=%p\n", a, *pte);
-      panic("uvmunmap: not mapped");
+      //printf("va=%p pte=%p\n", a, *pte);
+      //panic("uvmunmap: not mapped");
+	goto end;
     }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
@@ -200,6 +202,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
       kfree((void*)pa);
     }
     *pte = 0;
+  end:
     if(a == last)
       break;
     a += PGSIZE;
@@ -326,9 +329,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      //panic("uvmcopy: pte should exist");
+	continue;
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      //panic("uvmcopy: page not present");
+	continue;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -449,5 +454,35 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return 0;
   } else {
     return -1;
+  }
+}
+void vmprint(pagetable_t pagetable, int depth)
+{
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++)
+   {
+    pte_t pte = pagetable[i];
+
+    if((pte & PTE_V) && (pte & ( PTE_R | PTE_W | PTE_X )) == 0)
+     {
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      
+      for (int i = 0; i < depth; i++)
+        printf(".. ");
+
+      printf("%d: pte %p pa %p\n", i, pte, child);
+      vmprint((pagetable_t)child, depth+1);
+     }
+      else if(pte & PTE_V)
+     {
+      uint64 child = PTE2PA(pte);
+
+      for (int j = 0; j < depth; j++)
+        {
+        printf(".. ");
+        }
+       printf("%d: pte %p pa %p\n", i, pte, child);
+     }
   }
 }

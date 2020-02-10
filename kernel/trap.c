@@ -67,12 +67,47 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }else {
+      if (r_scause()==13 || r_scause()==15){
+       
+
+        if(r_stval() > p->sz){
+          printf("Tried to access location greater than process size\n");
+          p->killed =1;
+          goto bad;
+        }
+
+        if(PGROUNDDOWN(r_stval()) == PGROUNDDOWN((p->tf->sp)-PGSIZE)){
+          printf("Tried to access below stack %p\n", r_stval());
+          p->killed=1;
+          goto bad;
+        }
+
+
+        char *mem;
+        uint64 a;
+        a=PGROUNDDOWN(r_stval());
+        mem=kalloc();
+        if(mem==0){
+          printf("Creation of page failed: lack of sufficient heap memory\n");
+          p->killed=1;
+          goto bad;
+        }
+        memset(mem, 0, PGSIZE);
+        if(mappages(p->pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U)!=0){
+          printf("Error in mapping page\n");
+          kfree(mem);
+          p->killed=1;
+          goto bad;
+        }
+      }
+    else{
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
+    }
   }
-
+  bad:
   if(p->killed)
     exit(-1);
 
@@ -82,6 +117,8 @@ usertrap(void)
 
   usertrapret();
 }
+
+
 
 //
 // return to user space
