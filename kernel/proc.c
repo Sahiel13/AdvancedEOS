@@ -114,6 +114,11 @@ found:
     return 0;
   }
 
+  if((p->saveTF = (struct trapframe *)kalloc()) == 0){
+    release(&p->lock);
+    return 0;
+  }
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
 
@@ -123,6 +128,9 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->maxAlarmTicks = -1;
+  p->currentAlarmTicks = -1;
+  p->handler = -1;
   return p;
 }
 
